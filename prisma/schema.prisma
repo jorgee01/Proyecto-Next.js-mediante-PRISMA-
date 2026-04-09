@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model aulas {
+  id         Int        @id @default(autoincrement()) @db.UnsignedInt
+  nombre     String     @unique(map: "uq_aulas_nombre") @db.VarChar(50)
+  ubicacion  String?    @db.VarChar(100)
+  capacidad  Int?       @db.UnsignedSmallInt
+  created_at DateTime   @default(now()) @db.DateTime(0)
+  updated_at DateTime   @default(now()) @db.DateTime(0)
+  horarios   horarios[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model horarios {
+  id          Int                @id @default(autoincrement()) @db.UnsignedInt
+  curso       String             @db.VarChar(120)
+  profesor_id Int                @db.UnsignedInt
+  aula_id     Int?               @db.UnsignedInt
+  modalidad   horarios_modalidad
+  inicio      DateTime           @db.DateTime(0)
+  fin         DateTime           @db.DateTime(0)
+  color       String             @default("#2563eb") @db.VarChar(20)
+  created_at  DateTime           @default(now()) @db.DateTime(0)
+  updated_at  DateTime           @default(now()) @db.DateTime(0)
+  aulas       aulas?             @relation(fields: [aula_id], references: [id], onDelete: Restrict, map: "fk_horarios_aula")
+  profesores  profesores         @relation(fields: [profesor_id], references: [id], map: "fk_horarios_profesor")
+
+  @@index([aula_id, inicio, fin], map: "idx_horarios_busqueda")
+  @@index([profesor_id, inicio], map: "idx_horarios_profesor")
+}
+
+model profesores {
+  id         Int        @id @default(autoincrement()) @db.UnsignedInt
+  nombre     String     @db.VarChar(120)
+  correo     String?    @db.VarChar(150)
+  created_at DateTime   @default(now()) @db.DateTime(0)
+  updated_at DateTime   @default(now()) @db.DateTime(0)
+  horarios   horarios[]
+}
+
+enum horarios_modalidad {
+  VIRTUAL
+  PRESENCIAL
+}

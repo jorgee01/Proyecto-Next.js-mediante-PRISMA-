@@ -1,65 +1,291 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+  
+
+import { useEffect, useMemo, useState } from 'react';
+
+import type { EventInput } from '@fullcalendar/core';
+
+import HorarioForm from '@/components/HorarioForm';
+
+import HorariosTable from '@/components/HorariosTable';
+
+import SemanaCalendar from '@/components/SemanaCalendar';
+
+import type { AulaDTO, HorarioDTO } from '@/types/horario';
+
+  
+
+export default function HomePage() {
+
+  const [horarios, setHorarios] = useState<HorarioDTO[]>([]);
+
+  const [aulas, setAulas] = useState<AulaDTO[]>([]);
+
+  const [aulaSeleccionada, setAulaSeleccionada] = useState<string>('all');
+
+  const [inicioSemana, setInicioSemana] = useState<string>('');
+
+  const [finSemana, setFinSemana] = useState<string>('');
+
+  const [error, setError] = useState<string>('');
+
+  
+
+  async function loadAulas() {
+
+    const response = await fetch('/api/aulas');
+
+    if (!response.ok) {
+
+      setError('Error al cargar aulas');
+
+      return;
+
+    }
+
+    const data = (await response.json()) as AulaDTO[];
+
+    setAulas(data);
+
+  }
+
+  
+
+  async function loadHorarios(
+
+    customInicio: string = inicioSemana,
+
+    customFin: string = finSemana,
+
+    customAula: string = aulaSeleccionada,
+
+  ) {
+
+    if (!customInicio || !customFin) return;
+
+  
+
+    const params = new URLSearchParams({
+
+      inicioSemana: customInicio,
+
+      finSemana: customFin,
+
+      aulaId: customAula || 'all',
+
+    });
+
+  
+
+    const response = await fetch(`/api/horarios?${params.toString()}`);
+
+    if (!response.ok) {
+
+      setError('Error al cargar horarios');
+
+      return;
+
+    }
+
+    const data = (await response.json()) as HorarioDTO[];
+
+    setHorarios(data);
+
+  }
+
+  
+
+  useEffect(() => {
+
+    loadAulas();
+
+  }, []);
+
+  
+
+  useEffect(() => {
+
+    loadHorarios();
+
+  }, [inicioSemana, finSemana, aulaSeleccionada]);
+
+  
+
+  const eventos = useMemo<EventInput[]>(() => {
+
+    return horarios.map((item) => ({
+
+      id: String(item.id),
+
+      title: `${item.curso} - ${item.aula}`,
+
+      start: item.inicio,
+
+      end: item.fin,
+
+      backgroundColor: item.color,
+
+      borderColor: item.color,
+
+      extendedProps: {
+
+        profesor: item.profesor,
+
+        modalidad: item.modalidad,
+
+      },
+
+    }));
+
+  }, [horarios]);
+
+  
+
+  async function handleMove(payload: {
+
+    id: string;
+
+    inicio: string;
+
+    fin: string;
+
+  }): Promise<boolean> {
+
+    setError('');
+
+  
+
+    const response = await fetch(`/api/horarios/${payload.id}/move`, {
+
+      method: 'PATCH',
+
+      headers: { 'Content-Type': 'application/json' },
+
+      body: JSON.stringify({
+
+        inicio: payload.inicio,
+
+        fin: payload.fin,
+
+      }),
+
+    });
+
+  
+
+    const data = (await response.json()) as { message?: string };
+
+  
+
+    if (!response.ok) {
+
+      setError(data.message || 'No se pudo mover el horario');
+
+      return false;
+
+    }
+
+  
+
+    await loadHorarios();
+
+    return true;
+
+  }
+
+  
+
+  return (
+
+    <main className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6 lg:px-8">
+
+      <section className="rounded-2xl bg-slate-900 px-6 py-8 text-white shadow-sm">
+
+        <h1 className="text-3xl font-bold">Gestión de horarios</h1>
+
+        <p className="mt-2 text-sm text-slate-200">
+
+          Next.js + TypeScript + Tailwind + Prisma + MySQL 8.4
+
+        </p>
+
+      </section>
+
+  
+
+      {error && (
+
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+
+          {error}
+
+        </div>
+
+      )}
+
+  
+
+      <HorarioForm onSaved={() => loadHorarios()} />
+
+  
+
+      <section className="rounded-2xl bg-white p-6 shadow-sm">
+
+        <h2 className="mb-4 text-xl font-semibold">Filtro de aula</h2>
+
+  
+
+        <select
+
+          value={aulaSeleccionada}
+
+          onChange={(e) => setAulaSeleccionada(e.target.value)}
+
+          className="w-full max-w-sm rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-sky-500"
+
+        >
+
+          <option value="all">Todas las aulas y virtuales</option>
+
+          {aulas.map((aula) => (
+
+            <option key={aula.id} value={aula.id}>
+
+              {aula.nombre}
+
+            </option>
+
+          ))}
+
+        </select>
+
+      </section>
+
+  
+
+      <SemanaCalendar
+
+        eventos={eventos}
+
+        onMove={handleMove}
+
+        onRangeChange={(nuevoInicio, nuevoFin) => {
+
+          setInicioSemana(nuevoInicio);
+
+          setFinSemana(nuevoFin);
+
+        }}
+
+      />
+
+  
+
+      <HorariosTable horarios={horarios} onDeleted={() => loadHorarios()} />
+
+    </main>
+
+  );
+
 }
